@@ -1,0 +1,48 @@
+local Module = require(script.MainModule)
+Module:Load()
+
+--MAIN DETECTOR
+
+local Rep = game:GetService("ReplicatedStorage")
+local DB = game:GetService("Debris")
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules.RaycastHitbox)
+local Particle = require(Modules.Particle)
+local ImpactFrame = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect"):WaitForChild("ImpactFrame")
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local BulletEvent = WeaponEvents:WaitForChild("Bullet")
+local AddEvent = WeaponEvents:WaitForChild("Add")
+local RemoveEvent = WeaponEvents:WaitForChild("Remove")
+local EnableEvent = WeaponEvents:WaitForChild("Enable")
+
+local FireEvent = WeaponEvents:WaitForChild("Fire")
+
+function Bullet(plr, Bullet, Direction, Character, Tool, ProjectileInfo)
+	Module:bullettween(plr, Bullet, Direction, Character, Tool, ProjectileInfo)
+end
+
+function Fire(plr, Bullet, StartPoint, Character, Tool, ProjectileInfo)
+	Module:Fire(plr, Bullet, StartPoint, Character, Tool, ProjectileInfo)
+end
+
+function Add(plr,object,location,grip,tool)
+	Module:Add(plr,object,location,grip,tool)
+end
+
+function Remove(plr,object)
+	Module:Remove(plr,object)
+end
+
+function Enable(plr,o,t)
+	Module:Enable(plr,o,t)
+end
+
+BulletEvent.OnServerEvent:Connect(Bullet)
+FireEvent.OnServerEvent:Connect(Fire)
+AddEvent.OnServerEvent:Connect(Add)
+RemoveEvent.OnServerEvent:Connect(Remove)
+EnableEvent.OnServerEvent:Connect(Enable)
