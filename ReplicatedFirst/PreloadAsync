@@ -1,0 +1,2 @@
+game:GetService('ContentProvider'):PreloadAsync(game:GetDescendants())
+--this is just for preloading
