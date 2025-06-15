@@ -1,0 +1,109 @@
+local module = {Bleed = require(script.Parent:WaitForChild("Bleed"))}
+
+function module:Execute(Part,Hum,Char,Damage)
+	if Part.Name ~= "Torso" and not Part:GetAttribute("Broke") then
+		if not Part:GetAttribute("FractureDurability") then
+			Part:SetAttribute("FractureDurability",50)
+		end
+		Part:SetAttribute("FractureDurability",Part:GetAttribute("FractureDurability")-Damage)
+
+		if Part:GetAttribute("FractureDurability") <= 0 then
+			if (Part.Name == "Right Arm" and Char:FindFirstChild("Left Arm"):GetAttribute("Broke")) or (Part.Name == "Left Arm" and Char:FindFirstChild("Right Arm"):GetAttribute("Broke")) then return end
+
+			Part:SetAttribute("FractureDurability",nil)
+			Part:SetAttribute("Broke",true)
+			local Torso = Char:FindFirstChild("Torso")
+
+			if Torso then
+				local RightShoulder = Torso:FindFirstChild("Right Shoulder")
+				local LeftShoulder = Torso:FindFirstChild("Left Shoulder")
+				local RightHip = Torso:FindFirstChild("Right Hip")
+				local LeftHip = Torso:FindFirstChild("Left Hip")
+				local Neck = Torso:FindFirstChild("Neck")
+
+				if RightShoulder and LeftShoulder and RightHip and LeftHip and Neck then
+					local at0 = Instance.new("Attachment")
+					local at1 = Instance.new("Attachment")
+					local BallSocket = Instance.new("BallSocketConstraint")
+					at0.Name = Part.Name.."Attachment"
+					at0.Parent = Torso
+					at1.Name = "FractureAttachment"
+					at1.Parent = Part
+					BallSocket.Name = Part.Name.."Fracture"
+					BallSocket.Parent = Torso
+					BallSocket.Attachment0 = at0
+					BallSocket.Attachment1 = at1
+
+					if Part.Name == "Right Arm" then
+						at0.Position = Vector3.new(1.5, 0.5, 0)
+						at1.Position = Vector3.new(0, 0.5, 0)
+						RightShoulder.Enabled = false
+
+						if Char:FindFirstChild("CharacterValues") then
+							State(Char,Hum,false,true)
+						end
+					elseif Part.Name == "Left Arm" then
+						at0.Position = Vector3.new(-1.5, 0.5, 0)
+						at1.Position = Vector3.new(0, 0.5, 0)
+						LeftShoulder.Enabled = false
+					elseif Part.Name == "Right Leg" then
+						at0.Position = Vector3.new(0.5, -1, 0)
+						at1.Position = Vector3.new(0, 1, 0)
+						RightHip.Enabled = false
+
+						if Char:FindFirstChild("CharacterValues") then
+							State(Char,Hum,true)
+						end
+					elseif Part.Name == "Left Leg" then
+						at0.Position = Vector3.new(-0.5, -1, 0)
+						at1.Position = Vector3.new(0, 1, 0)
+						LeftHip.Enabled = false
+
+						if Char:FindFirstChild("CharacterValues") then
+							State(Char,Hum)
+						end
+					elseif Part.Name == "Head" then
+						BallSocket.LimitsEnabled = true
+						BallSocket.MaxFrictionTorque = 3
+						at0.Position = Vector3.new(0, 1, 0)
+						at0.Orientation = Vector3.new(0, 0, 90)
+						at1.Position = Vector3.new(0, -0.5, 0)
+						at1.Orientation = Vector3.new(0, 0, 90)
+						Neck.Enabled = false
+					end
+
+					Part.CanCollide = false
+					Part.Massless = true
+				end
+			end
+		end
+	end
+end
+
+function State(Char,Hum,RL,RA)
+	local CharacterValues = Char:FindFirstChild("CharacterValues")
+	local State = CharacterValues:FindFirstChild("State")
+	local BJP = State:FindFirstChild("BaseJumpPower")
+	local BWS = State:FindFirstChild("BaseWalkSpeed")
+	local JS = State:FindFirstChild("JumpSpeed")
+	local RLB = State:FindFirstChild("RLegBroken")
+	local RAB = State:FindFirstChild("RArmBroken")
+
+	if BJP and BWS and JS and RLB and RAB then
+		if RA then
+			RAB.Value = true
+		else	
+			JS.Value = 1
+			BJP.Value = 15
+			BWS.Value = 8
+			Hum.WalkSpeed = BJP.Value
+			Hum.JumpPower = BWS.Value
+
+			if RL then
+				RLB.Value = true
+			end
+		end
+	end
+end
+
+return module
