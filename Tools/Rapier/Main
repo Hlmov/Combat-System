@@ -1,0 +1,309 @@
+local Rep = game:GetService("ReplicatedStorage")
+local SG = game:GetService("StarterGui")
+local DB = game:GetService("Debris")
+local RS = game:GetService("RunService")
+repeat task.wait() until game:IsLoaded()
+RS.Stepped:Wait(.1)
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules:WaitForChild("RaycastHitbox"))
+local Particle = require(Modules:WaitForChild("Particle"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+
+--bindable events
+local PlayerEffectEvents = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect")
+local CooldownEvent = PlayerEffectEvents:WaitForChild("Cooldown")
+
+--variables
+local plr = game:GetService("Players").LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local animator = hum:WaitForChild("Animator")
+
+local tool = script.Parent
+local handle = tool:WaitForChild("Model")
+
+local config = tool:WaitForChild("Configuration")
+local assets = config:WaitForChild("Assets")
+
+local AnimFolder = Rep:WaitForChild("Animations")
+
+local Hitbox = RaycastHitbox.new(assets:WaitForChild("Hitbox"))
+Hitbox.DetectionMode = 2
+
+--values
+local WeaponSettings = require(config.WeaponSettings)
+local Cooldown = WeaponSettings.Cooldown
+local Damage = WeaponSettings.Damage
+local WalkSpeedRate = WeaponSettings.WalkSpeedRate
+local Effects = WeaponSettings.Effects
+
+local lastdetected
+
+local CanConnect = false
+local CurrentConnect = 1
+
+local charval = char:WaitForChild("CharacterValues")
+local charGuardVals = charval:WaitForChild("Guard")
+local charStateVals = charval:WaitForChild("State")
+
+local plrval = plr:WaitForChild("PlayerValues")
+
+local CooldownUIValues = {tool.Name,Color3.fromRGB(217, 217, 217),Cooldown}
+
+SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+--animations
+
+
+local SwingAnimations = {
+	Swing1 = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Swing1"));
+	Swing2 = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Swing2"));
+	Swing3 = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Swing3"));
+}
+
+local Animations = {
+	Idle = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Idle"));
+	Equip = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Equip"));
+	GuardHit = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Guarded"));
+	PGuardHit = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." PGuarded"));
+}
+
+RS.RenderStepped:Connect(function()
+	if charGuardVals:FindFirstChild("Guard") and charGuardVals:FindFirstChild("Guard").Value then
+		local detected = false
+		for i,v in pairs(SwingAnimations) do
+			if v.IsPlaying then
+				detected = true
+			end
+		end
+
+		if detected then
+			for i,v in pairs(SwingAnimations) do
+				v:Stop()
+			end
+			HitboxOff()
+		end
+	end
+end)
+
+function Animation(boolean,Animation)
+	if boolean then
+		if SwingAnimations[Animation] then
+			SwingAnimations[Animation]:Play()
+		else
+			Animations[Animation]:Play()
+		end
+	else
+		if Animation == "All" then
+			for i,v in pairs(SwingAnimations) do
+				v:Stop()
+			end
+			for i,v in pairs(Animations) do
+				v:Stop()
+			end
+			HitboxOff()
+		else
+			if SwingAnimations[Animation] then
+				SwingAnimations[Animation]:Stop()
+			else
+				Animations[Animation]:Stop()
+			end
+			HitboxOff()
+		end
+	end
+end
+
+function Connection(boolean,status)
+	task.spawn(function()
+		if boolean then
+			if charGuardVals:FindFirstChild("Guard") and not charGuardVals:FindFirstChild("Guard").Value then
+				SlowEvent:FireServer(true,hum,WalkSpeedRate)
+				CurrentConnect = status+1
+				CanConnect = true
+			else
+				CanConnect = false
+				CurrentConnect = 1
+
+				HitboxOff()
+				CooldownEvent:Fire(CooldownUIValues)
+				task.wait(Cooldown)
+
+				SlowEvent:FireServer(false,hum)
+				tool.Enabled = true
+				SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+			end
+		else
+			CanConnect = false
+			CurrentConnect = 1
+
+			HitboxOff()
+			CooldownEvent:Fire(CooldownUIValues)
+			task.wait(Cooldown)
+
+			SlowEvent:FireServer(false,hum)
+			tool.Enabled = true
+			SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		end
+	end)
+end
+
+function HitboxDetection(hit,h,rayresults)
+	if hit.Name == "HumanoidRootPart" then return end
+	local group = hit.Parent
+	if group == char then return end
+	local detectedhum = group:FindFirstChild("Humanoid")
+	if detectedhum then
+		if lastdetected and lastdetected.Parent == group then return end
+		lastdetected = hit
+		HitEvent:FireServer(true,rayresults.Position,hit,Damage,detectedhum,char.PrimaryPart,Effects)
+	else
+		if hit.Transparency == 1 or not hit.CanCollide or not hit.CanTouch or not hit.CanQuery then return end
+		HitEvent:FireServer(false,rayresults.Position,hit)
+	end
+end
+
+function HitboxOn()
+	if charGuardVals:FindFirstChild("Guard") and charGuardVals:FindFirstChild("Guard").Value then return end
+	SoundEvent:FireServer(true,handle:FindFirstChild("Swing"..CurrentConnect))
+	if plr and plrval and plrval:FindFirstChild("ShowHitbox") then
+		Hitbox.Visualizer = plrval:FindFirstChild("ShowHitbox").Value
+	end
+	Hitbox:HitStart()
+end
+
+function HitboxOff()
+	lastdetected = nil
+	Hitbox:HitStop()
+end
+
+function CheckIfAlive()
+	return (((plr and plr.Parent and char and char.Parent and hum and hum.Parent and hum.Health > 0 and char.PrimaryPart and char.PrimaryPart.Parent) and true) or false)
+end
+
+function Activated()
+	if charGuardVals:FindFirstChild("Guard").Value or not hum or not CheckIfAlive() or charStateVals:FindFirstChild("RArmBroken").Value then return end
+	if not CanConnect then
+		if not tool.Enabled then return end
+	end
+	CanConnect = false
+	tool.Enabled = false
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	if CurrentConnect-1 > 0 then
+		Animation(false,"Swing"..CurrentConnect-1)
+	end
+	Animation(true,"Swing"..CurrentConnect)
+	SlowEvent:FireServer(true,hum,WalkSpeedRate)
+end
+
+function Equipped()
+	task.spawn(function()
+		HitboxOff()
+		CanConnect = false
+		CurrentConnect = 1
+
+		SoundEvent:FireServer(true,handle:FindFirstChild("Equip"))
+		tool.Enabled = false
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+
+		CooldownEvent:Fire(CooldownUIValues)
+		task.wait(Cooldown)
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		tool.Enabled = true
+		SlowEvent:FireServer(false,hum)
+	end)
+
+	GripEvent:FireServer(true,tool,char:FindFirstChild("Right Arm"))
+	Animation(true,"Equip")
+	Animation(true,"Idle")
+end
+
+function Unequipped()
+	GripEvent:FireServer(false,tool,char:FindFirstChild("Right Arm"))
+	Animation(false,"All")
+
+	task.spawn(function()
+		SoundEvent:FireServer(false,handle:GetChildren())
+		CanConnect = false
+		CurrentConnect = 1
+		HitboxOff()
+		SlowEvent:FireServer(false,hum)
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	end)
+end
+
+function Guarded(State)
+	if State == "Guarded" then
+		SlowEvent:FireServer(true,hum,WalkSpeedRate,true)
+		CanConnect = false
+		tool.Enabled = false
+		CurrentConnect = 1
+		for i,v in pairs(SwingAnimations) do
+			v:Stop()
+		end
+		Animation(true,"GuardHit")
+		HitboxOff()
+		SoundEvent:FireServer(true,handle:FindFirstChild("Guarded"))
+		task.wait(0.7)
+		SlowEvent:FireServer(false,hum)
+		tool.Enabled = true
+	elseif State == "PGuarded" then
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+		SlowEvent:FireServer(true,hum,0,true)
+		CanConnect = false
+		tool.Enabled = false
+		CurrentConnect = 1
+		for i,v in pairs(SwingAnimations) do
+			v:Stop()
+		end
+		Animation(true,"PGuardHit")
+		HitboxOff()
+		SoundEvent:FireServer(true,handle:FindFirstChild("PGuarded"))
+		task.wait(1)
+		Animation(false,"PGuardHit")
+		SlowEvent:FireServer(false,hum)
+		tool.Enabled = true
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	end
+end
+
+tool.Activated:Connect(Activated)
+tool.Equipped:Connect(Equipped)
+tool.Unequipped:Connect(Unequipped)
+
+Hitbox.OnHit:Connect(HitboxDetection)
+
+HitEvent.OnClientEvent:Connect(Guarded)
+
+function ComboDisconnection()
+	Connection(false)
+end
+
+function ComboConnection(p)
+	Connection(true,p)
+end
+
+SwingAnimations.Swing1:GetMarkerReachedSignal("Hitbox Start"):Connect(HitboxOn)
+SwingAnimations.Swing1:GetMarkerReachedSignal("Hitbox End"):Connect(HitboxOff)
+SwingAnimations.Swing1:GetMarkerReachedSignal("Combo Connection"):Connect(ComboConnection)
+SwingAnimations.Swing1:GetMarkerReachedSignal("Combo Disconnection"):Connect(ComboDisconnection)
+
+SwingAnimations.Swing2:GetMarkerReachedSignal("Hitbox Start"):Connect(HitboxOn)
+SwingAnimations.Swing2:GetMarkerReachedSignal("Hitbox End"):Connect(HitboxOff)
+SwingAnimations.Swing2:GetMarkerReachedSignal("Combo Connection"):Connect(ComboConnection)
+SwingAnimations.Swing2:GetMarkerReachedSignal("Combo Disconnection"):Connect(ComboDisconnection)
+
+SwingAnimations.Swing3:GetMarkerReachedSignal("Hitbox Start"):Connect(HitboxOn)
+SwingAnimations.Swing3:GetMarkerReachedSignal("Hitbox End"):Connect(HitboxOff)
+SwingAnimations.Swing3:GetMarkerReachedSignal("Combo Disconnection"):Connect(ComboDisconnection)
