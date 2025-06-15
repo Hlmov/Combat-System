@@ -1,0 +1,42 @@
+local RS = game:GetService("RunService")
+
+local tool = script.Parent
+local model = tool:WaitForChild("Flintlock Pistol")
+local weldcf = tool:GetAttribute("BodyWeld")
+
+local equipped = false
+
+RS.Heartbeat:Connect(function()
+	if tool.Parent.Parent:IsA("Player") and tool.Parent.Parent.Character and not tool.Parent.Parent.Character:FindFirstChild("Models"):FindFirstChild(tool.Name.." Model") and not equipped then
+		local char = tool.Parent.Parent.Character
+		local modelC = model:Clone()
+		local weld = Instance.new("Weld")
+		weld.Part0 = char:FindFirstChild("Torso")
+		weld.Part1 = modelC["Body"]
+		weld.C1 = weldcf
+		
+		modelC.Name = tool.Name.." Model"
+		modelC.Parent = char:FindFirstChild("Models")
+		
+		weld.Parent = char:FindFirstChild("Torso")
+	end
+end)
+
+tool.Equipped:Connect(function()
+	equipped = true
+	tool.Parent:FindFirstChild("Models"):FindFirstChild(tool.Name.." Model"):Destroy()
+end)
+
+tool.Unequipped:Connect(function()
+	local char = tool.Parent.Parent.Character
+	local modelC = model:Clone()
+	local weld = Instance.new("Weld")
+	weld.Part0 = char:FindFirstChild("Torso")
+	weld.Part1 = modelC["Body"]
+	weld.C1 = weldcf
+
+	modelC.Name = tool.Name.." Model"
+	modelC.Parent = char:FindFirstChild("Models")
+
+	weld.Parent = char:FindFirstChild("Torso")
+end)
