@@ -1,17 +1,1 @@
-local module = {
-	Bleed = require(script:WaitForChild("Bleed"));
-	Fracture = require(script:WaitForChild("Fracture"));
-	Dismemberment = require(script:WaitForChild("Dismemberment"));
-}
-
-function module:ApplyEffects(Effects,Part,Hum,Char,Dmg)
-	if Effects and Part and Part:IsA("Part") and Part.Name ~= "HumanoidRootPart" and Hum and Hum.Health > 0 and Char then
-		for i,v in pairs(Effects) do
-			if module[v] then
-				module[v]:Execute(Part,Hum,Char,Dmg)
-			end
-		end
-	end
-end
-
-return module
+https://github.com/Hlmov/Combat-System/tree/main/ServerScriptService/GunSystem./MainModule./Body%20Effects.
