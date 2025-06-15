@@ -1,0 +1,202 @@
+local module = {}
+
+local DB = game:GetService("Debris")
+
+local ParticleDelay = .01
+
+function module:PartSlice(pos,color,m)
+	local particles = script.PartSlice
+	local part = Instance.new("Part")
+	local at = Instance.new("Attachment")
+	at.Parent = part
+	part.Name = "PartSlice"
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Size = Vector3.new(0.1,0.1,0.1)
+	part.Position = pos
+	part.Parent = workspace.Particles
+	for i,v in pairs(particles:GetDescendants()) do
+		if v:IsA("ParticleEmitter") or v:IsA("Sound") then
+			local p = v:Clone()
+			p.Parent = at
+			if p:IsA("ParticleEmitter") then
+				if p:GetAttribute("Material") == "Regular" and CheckMaterial(m) == "Regular" then
+					p.Color = ColorSequence.new(color)
+					task.wait(ParticleDelay)
+					p:Emit(p:GetAttribute("EmitCount"))
+				elseif p:GetAttribute("Material") == "Metal" and CheckMaterial(m) == "Metal" then
+					p.Color = ColorSequence.new(Color3.fromRGB(255, 255, 125))
+					task.wait(ParticleDelay)
+					p:Emit(p:GetAttribute("EmitCount"))
+				elseif p:GetAttribute("Material") == "Wood" and CheckMaterial(m) == "Wood" then
+					p.Color = ColorSequence.new(color)
+					task.wait(ParticleDelay)
+					p:Emit(p:GetAttribute("EmitCount"))
+				elseif p:GetAttribute("Material") == "Glass" and CheckMaterial(m) == "Glass" then
+					p.Color = ColorSequence.new(color)
+					task.wait(ParticleDelay)
+					p:Emit(p:GetAttribute("EmitCount"))
+			--[[elseif p:GetAttribute("Material") == "any" then
+				p.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+				task.wait(ParticleDelay)
+				p:Emit(p:GetAttribute("EmitCount"))]]
+				end
+			elseif p:IsA("Sound") then
+				p:FindFirstChild("Pitch").Octave = math.random(0.7,2)
+				if p.Name == "Regular" and CheckMaterial(m) == "Regular" then
+					p:Play()
+				elseif p.Name == "Metal" and CheckMaterial(m) == "Metal" then
+					p:Play()
+				elseif p.Name == "Glass" and CheckMaterial(m) == "Glass" then
+					p:Play()
+				elseif p.Name == "Wood" and CheckMaterial(m) == "Wood" then
+					p:Play()
+				end
+			end
+		end
+	end
+
+	DB:AddItem(part,3)
+end
+
+function module:BloodSlice(pos)
+	local particles = script.BloodSlice
+	local part = Instance.new("Part")
+	local at = Instance.new("Attachment")
+	at.Parent = part
+	part.Name = "BloodSlice"
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Size = Vector3.new(0.1,0.1,0.1)
+	part.Position = pos
+	part.Parent = workspace.Particles
+	for i,v in pairs(particles:GetChildren()) do
+		local p = v:Clone()
+		p.Parent = at
+		if v:IsA("ParticleEmitter") then
+		task.wait(ParticleDelay)
+			p:Emit(p:GetAttribute("EmitCount"))
+		elseif v:IsA("Sound") then
+			p:Play()
+		end
+	end
+
+	DB:AddItem(part,3)
+end
+
+function module:PartHit(pos,color)
+	local particles = script.PartHit
+	local part = Instance.new("Part")
+	local at = Instance.new("Attachment")
+	at.Parent = part
+	part.Name = "PartHit"
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Size = Vector3.new(0.1,0.1,0.1)
+	part.Position = pos
+	part.Parent = workspace.Particles
+	for i,v in pairs(particles:GetChildren()) do
+		local p = v:Clone()
+		p.Parent = at
+		if p:IsA("ParticleEmitter") then
+			p.Color = ColorSequence.new(color)
+			task.wait(ParticleDelay)
+			p:Emit(p:GetAttribute("EmitCount"))
+		elseif p:IsA("Sound") then
+			p:FindFirstChild("Pitch").Octave = math.random(0.7,2)
+			p:Play()
+		end
+	end
+
+	DB:AddItem(part,3)
+end
+
+function module:PartHeal(part)
+	local particles = script.PartHeal
+	for i,v in pairs(particles:GetChildren()) do
+		local p = v:Clone()
+		p.Parent = part
+		if p:IsA("ParticleEmitter") then
+			task.wait(ParticleDelay)
+			p:Emit(p:GetAttribute("EmitCount"))
+		elseif p:IsA("Sound") then
+			p:Play()
+		end
+		DB:AddItem(p,3)
+	end
+end
+
+function module:BloodHit(pos)
+	local particles = script.BloodHit
+	local part = Instance.new("Part")
+	local at = Instance.new("Attachment")
+	at.Parent = part
+	part.Name = "BloodHit"
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Size = Vector3.new(0.1,0.1,0.1)
+	part.Position = pos
+	part.Parent = workspace.Particles
+	for i,v in pairs(particles:GetChildren()) do
+		local p = v:Clone()
+		p.Parent = at
+		task.wait(ParticleDelay)
+		p:Emit(p:GetAttribute("EmitCount"))
+	end
+
+	DB:AddItem(part,3)
+end
+
+function module:GuardBreak(pos)
+	local particles = script.GuardBreak
+	local part = Instance.new("Part")
+	local at = Instance.new("Attachment")
+	at.Parent = part
+	part.Name = "GuardBreak"
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Size = Vector3.new(0.1,0.1,0.1)
+	part.Position = pos
+	part.Parent = workspace.Particles
+	for i,v in pairs(particles:GetChildren()) do
+		local p = v:Clone()
+		p.Parent = at
+		if p:IsA("ParticleEmitter") then
+			task.wait(ParticleDelay)
+			p:Emit(p:GetAttribute("EmitCount"))
+		elseif p:IsA("Sound") then
+			p:Play()
+		end
+	end
+
+	DB:AddItem(part,3)
+end
+
+function CheckMaterial (m)
+	if m == Enum.Material.Plastic or  m == Enum.Material.SmoothPlastic or  m == Enum.Material.Neon or  m == Enum.Material.Marble or  m == Enum.Material.Granite or  m == Enum.Material.Slate or  m == Enum.Material.Concrete or  m == Enum.Material.Pebble or m == Enum.Material.Pavement or  m == Enum.Material.Sand or  m == Enum.Material.Brick or m == Enum.Material.Cobblestone or m == Enum.Material.Grass or m == Enum.Material.Fabric then
+		return "Regular"
+	elseif m == Enum.Material.Metal or  m == Enum.Material.DiamondPlate or  m == Enum.Material.CorrodedMetal then
+		return "Metal"
+	elseif m == Enum.Material.Glass or  m == Enum.Material.Ice or  m == Enum.Material.ForceField or  m == Enum.Material.Foil then
+		return "Glass"
+	elseif m == Enum.Material.Wood or  m == Enum.Material.WoodPlanks then
+		return "Wood"
+	end
+end
+
+return module
