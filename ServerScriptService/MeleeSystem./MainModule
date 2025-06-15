@@ -1,0 +1,186 @@
+local module = {}
+
+local Rep = game:GetService("ReplicatedStorage")
+local DB = game:GetService("Debris")
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules.RaycastHitbox)
+local Particle = require(Modules.Particle)
+local ImpactFrame = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect"):WaitForChild("ImpactFrame")
+
+local BodyEffects = require(script:WaitForChild("Body Effects"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+local ThrowEvent = WeaponEvents:WaitForChild("Throw")
+
+local BloodEvent = Rep.Events.PlayerEffect.BloodDrips
+
+local UnguardEvent = WeaponEvents:WaitForChild("Unguard")
+
+function module:Load()
+	print("WeaponSystemLoaded")
+end
+
+function module:Hitted(plr,IsHum,Position,Hit,Damage,Hum,PrimaryPart,Effects)
+	if not plr or not plr.Character or not Hit then return end
+	task.spawn(function()
+		local char = plr.Character
+		if IsHum then
+			if Hum then
+				local charval = Hum.Parent:FindFirstChild("CharacterValues")
+				if charval then
+					local GuardVals = charval:FindFirstChild("Guard")
+
+					if GuardVals:FindFirstChild("Guard") and GuardVals:FindFirstChild("PerfectGuard") then
+						local G = GuardVals:FindFirstChild("Guard")
+						local GD = GuardVals:FindFirstChild("GuardDurability")
+
+						local PG = GuardVals:FindFirstChild("PerfectGuard").Value
+						local GRA = GuardVals:FindFirstChild("GuardReliefAmount").Value
+						if not G.Value then
+							Hum:TakeDamage(Damage)
+							Particle:BloodSlice(Position)
+							BloodEvent:FireAllClients(Hit,Hit.CFrame.LookVector*-1,math.round(Damage*0.3))
+
+							BodyEffects:ApplyEffects(Effects,Hit,Hum,Hum.Parent,Damage)
+						elseif G.Value then
+							if PG then
+								ImpactFrame:FireClient(plr,"PGuarded")
+								HitEvent:FireClient(plr,"PGuarded")
+
+								char:FindFirstChild("Humanoid"):TakeDamage(Damage)
+								Particle:BloodHit(PrimaryPart.Position)
+								Particle:PartSlice(Position,Hit.Color,Enum.Material.Metal)
+							else
+								ImpactFrame:FireClient(plr,"Guarded")
+								HitEvent:FireClient(plr,"Guarded")
+								Particle:BloodHit(Position)
+								Particle:PartSlice(Position,Hit.Color,Enum.Material.Metal)
+								char:FindFirstChild("Humanoid"):TakeDamage(math.round(Damage*GRA))
+								Hum:TakeDamage(Damage*GRA)
+								GD.Value -= Damage
+								if GD.Value <= 0 then
+									GD.Value = 150
+									if Hum.Parent and game:GetService("Players"):GetPlayerFromCharacter(Hum.Parent) then
+										UnguardEvent:FireClient(game:GetService("Players"):GetPlayerFromCharacter(Hum.Parent))
+									else
+										G.Value = false
+									end
+									Particle:GuardBreak(Position)
+								end
+							end
+						end
+					end
+				else
+					Hum:TakeDamage(Damage)
+					Particle:BloodSlice(Position)
+					BloodEvent:FireAllClients(Hit,Hit.CFrame.LookVector*-1,math.round(Damage*0.3))
+
+					BodyEffects:ApplyEffects(Effects,Hit,Hum,Hum.Parent,Damage)
+				end
+			end
+		else
+			Particle:PartSlice(Position,Hit.Color,Hit.Material)
+		end
+	end)
+end
+
+function module:Grip(plr,bool,tool,arm)
+	if not plr or not tool or not arm or not tool:FindFirstChild("Model") then return end
+	task.spawn(function()
+		if bool then
+			local motor = Instance.new("Motor6D")
+			motor.Name = tool.Name
+			motor.Part0 = arm
+			motor.Part1 = tool:FindFirstChild("Model")
+			motor.C0 = tool.Grip
+			motor.Parent = arm
+		else
+			for i,v in pairs(arm:GetChildren()) do
+				if i == tool.Name and v:IsA("Motor6D") then
+					v:Destroy()
+				end
+			end
+		end
+	end)
+end
+
+function module:Sound(plr,bool,v)
+	if not plr or not v then return end
+	task.spawn(function()
+		if bool then
+			if type(v) == "table" then
+				for i,s in pairs(v) do
+					if s:IsA("Sound") then
+						s:Play()
+					end
+				end
+			else
+				if v then
+					v:Play()
+				end
+			end
+		else
+			if type(v) == "table" then
+				for i,s in pairs(v) do
+					if s:IsA("Sound") then
+						s:Stop()
+					end
+				end
+			else
+				if v then
+					v:Stop()
+				end
+			end
+		end
+	end)
+end
+
+function module:Slow(plr,bool,hum,WalkSpeedRate,bypass)
+	if not plr or not hum then return end
+	task.spawn(function()
+		local charval = hum.Parent:FindFirstChild("CharacterValues")
+		local GuardVals = charval:FindFirstChild("Guard")
+		local KickVals = charval:FindFirstChild("Kick")
+		local State = charval:FindFirstChild("State")
+
+		if charval and GuardVals and State and State:FindFirstChild("BaseWalkSpeed") and State:FindFirstChild("BaseJumpPower") and not GuardVals:FindFirstChild("Guard").Value then
+			if bool then
+				if not bypass then
+					if hum.WalkSpeed < State:FindFirstChild("BaseWalkSpeed").Value and hum.JumpPower == 0 then return end
+				end
+				hum.WalkSpeed = math.round(hum.WalkSpeed*WalkSpeedRate)
+				hum.JumpPower = 0
+
+				KickVals:FindFirstChild("CanKick").Value = false
+				GuardVals:FindFirstChild("CanGuard").Value = false
+			else
+				hum.WalkSpeed = State:FindFirstChild("BaseWalkSpeed").Value
+				hum.JumpPower = State:FindFirstChild("BaseJumpPower").Value
+
+				KickVals:FindFirstChild("CanKick").Value = true
+				GuardVals:FindFirstChild("CanGuard").Value = true
+			end
+		end
+	end)
+end
+
+function module:Throw(plr,tool,part,velocity,proptime)
+	local partC = part:Clone()
+	partC.CanCollide = true
+	partC.CanTouch = true
+	partC.CanQuery = true
+	partC.Parent = workspace:FindFirstChild("Props"):FindFirstChild("Tools")
+	partC.Velocity = (velocity * 30) + Vector3.new(0,30,0)
+	DB:AddItem(partC,proptime)
+
+	tool:Destroy()
+end
+
+return module
