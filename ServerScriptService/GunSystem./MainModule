@@ -1,0 +1,143 @@
+local module = {}
+
+local Rep = game:GetService("ReplicatedStorage")
+local DB = game:GetService("Debris")
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules.RaycastHitbox)
+local Particle = require(Modules.Particle)
+local ImpactFrame = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect"):WaitForChild("ImpactFrame")
+
+local BodyEffects = require(script:WaitForChild("Body Effects"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local BulletEvent = WeaponEvents:WaitForChild("Bullet")
+
+local BloodEvent = Rep.Events.PlayerEffect.BloodDrips
+
+local UnguardEvent = WeaponEvents:WaitForChild("Unguard")
+
+function module:Load()
+	print("GunSystemLoaded")
+end
+
+function module:Hitted(plr,Hum,Position,Hit,Damage,Effects,Multiply)
+	if not plr or not plr.Character or not Hit then return end
+	task.spawn(function()
+		local char = plr.Character
+		if Hum then
+			if Multiply[Hit.Name] then
+				Damage = Damage*Multiply[Hit.Name]
+			end
+			Hum:TakeDamage(Damage)
+			Particle:BloodSlice(Position)
+			BloodEvent:FireAllClients(Hit,Hit.CFrame.LookVector*-1,math.round(Damage*0.3))
+
+			BodyEffects:ApplyEffects(Effects,Hit,Hum,Hum.Parent,Damage)
+		else
+			Particle:PartSlice(Position,Hit.Color,Hit.Material)
+		end
+	end)
+end
+
+function module:Add(plr,c,location,grip,tool)
+	local object = c:Clone()
+	object.Parent = location
+	if object:IsA("Model") then
+		object = object.PrimaryPart
+	end
+	local motor = Instance.new("Motor6D")
+	motor.Name = object.Name
+	motor.Part0 = grip
+	motor.Part1 = object
+	motor.C0 = tool.Grip
+	motor.Parent = grip
+		--[[for i,v in pairs(arm:GetChildren()) do
+			if i == tool.Name and v:IsA("Motor6D") then
+				v:Destroy()
+			end
+		end]]
+end
+
+function module:Remove(plr,ob)
+	ob:Destroy()
+end
+
+function module:Enable(plr,obj,t)
+	if obj:IsA("ParticleEmitter") then
+		obj:Emit(obj:GetAttribute("EmitCount"))
+	elseif obj:IsA("Light") then
+		obj.Enabled = true
+		task.wait(t)
+		obj.Enabled = false
+	end
+end
+
+function module:Fire(plr, Bul, StartPoint, Character, Tool, ProjectileInfo)
+	local Bullet = Bul:Clone()
+	Bullet.Parent = workspace.Props.Projectiles
+	Bullet:FindFirstChild("Trail").Enabled = true
+	Bullet.CFrame = StartPoint
+
+	local maxdistance = ProjectileInfo.MaxDistance
+	local stepdistance = ProjectileInfo.TravelSpeed
+	for times = 1, math.floor(maxdistance/stepdistance) do
+		game:GetService("RunService").Stepped:Wait()
+		if module:movebullet(plr, Bullet, Bullet.CFrame.LookVector, Character, Tool, ProjectileInfo) == true then break end
+	end
+	if Bullet then
+		Bullet:Destroy()
+	end
+end
+
+function module:movebullet(plr, Bullet, Direction, Character, Tool, ProjectileInfo)
+	local ReturningBool = false
+
+	Bullet.Position = Bullet.Position + (Direction * ProjectileInfo.TravelSpeed) - Vector3.new(0,.1,0)
+	Bullet.Orientation = Bullet.Orientation - Vector3.new(.05,0,0)
+
+	local RayRaycastParams = RaycastParams.new()
+	RayRaycastParams.RespectCanCollide = true
+	RayRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	RayRaycastParams.FilterDescendantsInstances = {Bullet, Character, Tool}	
+	local ray = workspace:Raycast(Bullet.CFrame.Position, Direction * ProjectileInfo.TravelSpeed, RayRaycastParams)
+	if ray then
+		ReturningBool = true
+		module:Hitted(plr, ray.Instance.Parent:FindFirstChildOfClass("Humanoid"), Bullet.Position, ray.Instance, ProjectileInfo.Damage, ProjectileInfo.Effects, ProjectileInfo.DamageMultiplier)
+		Bullet:Destroy()
+	else
+		ReturningBool = false
+	end
+	return ReturningBool
+end
+
+--[[function module:bullettween(Bul, Direction, Character, Tool, ProjectileInfo)
+	local Bullet = Bul:Clone()
+	Bullet.Parent = workspace.Props.Projectiles
+	local RayRaycastParams = RaycastParams.new()
+	RayRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	RayRaycastParams.FilterDescendantsInstances = {Bullet, Character, Tool}	
+	local GunRay = Ray.new(Tool.Model.FirePoint.Position, Tool.Model.FirePoint.CFrame.LookVector * ProjectileInfo.MaxDistance)
+	local hit, position = workspace:FindPartOnRayWithIgnoreList(GunRay, RayRaycastParams)
+	local bulletDrop = (position - Tool.Model.FirePoint.Position).magnitude/1000 -- divide by anyting. 1000 seems resonable to me
+	local NewPosition = Vector3.new(position.X, position.Y - bulletDrop, position.Z)
+	local bulletTime = bulletDrop
+
+	local BulletInfo = TweenInfo.new(
+		bulletTime, -- having bullet drop and time be the same, but you could do something else
+		Enum.EasingStyle.Linear,
+		Enum.EasingDirection.InOut,
+		0,
+		false
+	)
+
+	local BulletTweenProperties = {
+		Position = NewPosition -- sets the position of the bullet to the position we wanted
+	}
+	local BulletTween = game:GetService("TweenService"):Create(Bullet, BulletInfo, BulletTweenProperties)
+	BulletTween:Play()
+end]]
+
+return module
