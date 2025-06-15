@@ -1,0 +1,10 @@
+local players = game:GetService("Players")
+
+players.PlayerAdded:Connect(function(plr)
+	m:PreparePlayer(plr)
+	plr.CharacterAdded:Connect(function()
+		for i,v in pairs(script:GetChildren()) do
+			v:Clone().Parent = plr.Backpack
+		end
+	end)
+end)
