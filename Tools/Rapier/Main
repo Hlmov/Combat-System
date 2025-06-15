@@ -127,6 +127,7 @@ function Connection(boolean,status)
 			if charGuardVals:FindFirstChild("Guard") and not charGuardVals:FindFirstChild("Guard").Value then
 				SlowEvent:FireServer(true,hum,WalkSpeedRate)
 				CurrentConnect = status+1
+				tool.Enabled = true
 				CanConnect = true
 			else
 				CanConnect = false
