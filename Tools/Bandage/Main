@@ -1,0 +1,250 @@
+local Rep = game:GetService("ReplicatedStorage")
+local SG = game:GetService("StarterGui")
+local DB = game:GetService("Debris")
+local ContextActionService = game:GetService("ContextActionService")
+local RS = game:GetService("RunService")
+repeat task.wait() until game:IsLoaded()
+RS.Stepped:Wait(.1)
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local Particle = require(Modules:WaitForChild("Particle"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local HealEvents = Rep:WaitForChild("Events"):WaitForChild("HealSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+local WrapEvent = HealEvents:WaitForChild("Wrap")
+local DisconnectEvent = HealEvents:WaitForChild("WrapDisconnect")
+
+--bindable events
+local PlayerEffectEvents = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect")
+local CooldownEvent = PlayerEffectEvents:WaitForChild("Cooldown")
+
+--variables
+local plr = game:GetService("Players").LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local animator = hum:WaitForChild("Animator")
+
+local tool = script.Parent
+local handle = tool:WaitForChild("Model")
+
+local config = tool:WaitForChild("Configuration")
+
+local AnimFolder = Rep:WaitForChild("Animations")
+
+--values
+local Settings = require(config.Settings)
+local Cooldown = Settings.Cooldown
+local Heal = Settings.Heal
+local WalkSpeedRate = Settings.WalkSpeedRate
+
+local charval = char:WaitForChild("CharacterValues")
+local charGuardVals = charval:WaitForChild("Guard")
+local charStateVals = charval:WaitForChild("State")
+
+local plrval = plr:WaitForChild("PlayerValues")
+
+local CooldownUIValues = {tool.Name,Color3.fromRGB(217, 217, 217),Cooldown}
+
+local equipped = false
+local mouseDown = false
+local lastClick = 0
+
+local CurrentLimb
+
+ContextActionService:UnbindAction("Bandage")
+
+SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+--animations
+
+local Animations = {
+	Idle = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Idle"));
+	Equip = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Equip"));
+}
+
+local WrapAnimations = {
+	HeadWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Head Wrap"));
+	TorsoWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Torso Wrap"));
+	RightArmWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." RA Wrap"));
+	LeftArmWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." LA Wrap"));
+	RightLegWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." RL Wrap"));
+	LeftLegWrap = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." LL Wrap"));
+}
+
+function Animation(boolean,Animation)
+	if boolean then
+		if WrapAnimations[Animation] then
+			WrapAnimations[Animation]:Play()
+		else
+			Animations[Animation]:Play()
+		end
+	else
+		if Animation == "All" then
+			for i,v in pairs(WrapAnimations) do
+				v:Stop()
+			end
+			for i,v in pairs(Animations) do
+				v:Stop()
+			end
+		elseif Animation == "Wrap" then
+			for i,v in pairs(WrapAnimations) do
+				v:Stop()
+			end
+		else
+			if WrapAnimations[Animation] then
+				WrapAnimations[Animation]:Stop()
+			else
+				Animations[Animation]:Stop()
+			end
+		end
+	end
+end
+
+RS.RenderStepped:Connect(function()
+	if char and char:FindFirstChild("Right Arm") and (char:FindFirstChild("Right Arm"):GetAttribute("Bleed") or char:FindFirstChild("Right Arm"):GetAttribute("Broke")) then
+		CurrentLimb = char:FindFirstChild("Right Arm")
+	else
+		if not CurrentLimb then
+			for i,v in pairs(char:GetChildren()) do
+				if v and v:IsA("Part") and (v:GetAttribute("Bleed") or v:GetAttribute("Broke")) then
+					if not CurrentLimb then
+						CurrentLimb = v
+					end
+				end
+			end
+		end
+	end
+end)
+
+function Input(actionName, inputState, inputObject)
+	if inputState == Enum.UserInputState.Begin then
+		if CurrentLimb and hum and CheckIfAlive() and tool.Enabled and equipped then
+			if tick()-lastClick >= 1 then
+				lastClick = tick()
+				mouseDown = true
+				tool.Enabled = false
+				
+				SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+				
+				if CurrentLimb.Name == "Right Arm" then
+					Animation(true,"RightArmWrap")
+				elseif CurrentLimb.Name == "Left Arm" then
+					Animation(true,"LeftArmWrap")
+				elseif CurrentLimb.Name == "Right Leg" then
+					Animation(true,"RightLegWrap")
+					charStateVals:FindFirstChild("PauseArm").Value = true
+				elseif CurrentLimb.Name == "Left Leg" then
+					Animation(true,"LeftLegWrap")
+					charStateVals:FindFirstChild("PauseArm").Value = true
+				elseif CurrentLimb.Name == "Torso" then
+					Animation(true,"TorsoWrap")
+					charStateVals:FindFirstChild("PauseArm").Value = true
+				elseif CurrentLimb.Name == "Head" then
+					Animation(true,"HeadWrap")
+					charStateVals:FindFirstChild("PauseArm").Value = true
+				end
+
+				SlowEvent:FireServer(true,hum,WalkSpeedRate)
+
+				task.spawn(function()
+					repeat task.wait() until (hum.Health >= 100 or not CurrentLimb or not CurrentLimb:GetAttribute("Bleed"))
+					mouseDown = false
+					DisconnectEvent:FireServer(CurrentLimb,handle)
+					CurrentLimb = nil
+					Animation(false,"Wrap")
+					charStateVals:FindFirstChild("PauseArm").Value = false
+					CooldownEvent:Fire(CooldownUIValues)
+					task.wait(Cooldown)
+
+					tool.Enabled = true
+					SlowEvent:FireServer(false,hum)
+					SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+				end)
+			end
+		end
+	elseif inputState == (Enum.UserInputState.End or Enum.UserInputState.Cancel) then
+		if CurrentLimb and mouseDown and not tool.Enabled then
+			mouseDown = false
+			DisconnectEvent:FireServer(CurrentLimb,handle)
+			CurrentLimb = nil
+			Animation(false,"Wrap")
+			charStateVals:FindFirstChild("PauseArm").Value = false
+			CooldownEvent:Fire(CooldownUIValues)
+			task.wait(Cooldown)
+			
+			tool.Enabled = true
+			SlowEvent:FireServer(false,hum)
+			SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		end
+	end
+end
+
+function CheckIfAlive()
+	return (((plr and plr.Parent and char and char.Parent and hum and hum.Parent and hum.Health > 0 and char.PrimaryPart and char.PrimaryPart.Parent) and true) or false)
+end
+
+function Equipped()
+	ContextActionService:BindAction("Bandage", Input, true, Enum.UserInputType.MouseButton1)
+	ContextActionService:SetImage("Bandage", "rbxassetid://13492314435")
+	ContextActionService:SetPosition("Bandage",UDim2.new(-0.5, 0, -0.05, 0))
+	charStateVals:FindFirstChild("PauseArm").Value = false
+	
+	equipped = true
+	GripEvent:FireServer(true,tool,char:FindFirstChild("Right Arm"))
+	Animation(true,"Equip")
+	Animation(true,"Idle")
+
+	SoundEvent:FireServer(true,handle:FindFirstChild("Equip"))
+	tool.Enabled = false
+	
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	
+		CooldownEvent:Fire(CooldownUIValues)
+		task.wait(Cooldown)
+	
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	
+		tool.Enabled = true
+		SlowEvent:FireServer(false,hum)
+end
+
+function Unequipped()
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	
+	ContextActionService:UnbindAction("Bandage")
+
+	equipped = false
+	DisconnectEvent:FireServer(CurrentLimb,handle)
+	CurrentLimb = nil
+	GripEvent:FireServer(false,tool,char:FindFirstChild("Right Arm"))
+	Animation(false,"All")
+	charStateVals:FindFirstChild("PauseArm").Value = false
+
+	task.spawn(function()
+		SoundEvent:FireServer(false,handle:GetChildren())
+		task.wait(Cooldown)
+		SlowEvent:FireServer(false,hum)
+	end)
+end
+
+tool.Equipped:Connect(Equipped)
+tool.Unequipped:Connect(Unequipped)
+
+function Connect(p)
+	if CurrentLimb then
+		WrapEvent:FireServer(char,hum,CurrentLimb,handle,p,Heal)
+	end
+end
+
+WrapAnimations.HeadWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
+WrapAnimations.TorsoWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
+WrapAnimations.RightArmWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
+WrapAnimations.LeftArmWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
+WrapAnimations.RightLegWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
+WrapAnimations.LeftLegWrap:GetMarkerReachedSignal("Connect"):Connect(Connect)
