@@ -1,0 +1,267 @@
+local Rep = game:GetService("ReplicatedStorage")
+local SG = game:GetService("StarterGui")
+local DB = game:GetService("Debris")
+local ContextActionService = game:GetService("ContextActionService")
+local RS = game:GetService("RunService")
+repeat task.wait() until game:IsLoaded()
+RS.Stepped:Wait(.1)
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules:WaitForChild("RaycastHitbox"))
+local Particle = require(Modules:WaitForChild("Particle"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+local AddEvent = WeaponEvents:WaitForChild("Add")
+local RemoveEvent = WeaponEvents:WaitForChild("Remove")
+local EnableEvent = WeaponEvents:WaitForChild("Enable")
+
+--bindable events
+local PlayerEffectEvents = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect")
+local CooldownEvent = PlayerEffectEvents:WaitForChild("Cooldown")
+local FireEvent = WeaponEvents:WaitForChild("Fire")
+
+--variables
+local plr = game:GetService("Players").LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local animator = hum:WaitForChild("Animator")
+
+local tool = script.Parent
+local handle = tool:WaitForChild("Model")
+
+local config = tool:WaitForChild("Configuration")
+
+local AnimFolder = Rep:WaitForChild("Animations")
+
+--values
+local WeaponSettings = require(config.WeaponSettings).Weapon
+local Cooldown = WeaponSettings.Cooldown
+local HoldingWalkSpeedRate = WeaponSettings.HoldingWalkSpeedRate
+local AimingWalkSpeedRate = WeaponSettings.AimingWalkSpeedRate
+local ReloadWalkSpeedRate = WeaponSettings.ReloadWalkSpeedRate
+local MagCapacity = WeaponSettings.MagCapacity
+
+local BulletSettings = require(config.WeaponSettings).Bullet
+
+local charval = char:WaitForChild("CharacterValues")
+local charStateVals = charval:WaitForChild("State")
+
+local plrval = plr:WaitForChild("PlayerValues")
+
+local CooldownUIValues = {tool.Name,Color3.fromRGB(217, 217, 217),Cooldown}
+
+SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+Mag = MagCapacity
+toggle = false
+
+--animations
+
+local Animations = {
+	Idle = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Idle"));
+	Equip = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Equip"));
+	NAIdle = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Idle NoAmmo"));
+	NAEquip = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Equip NoAmmo"));
+	Fire = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Fire"));
+	AimFire = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." AimFire"));
+	Reload = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Reload"));
+	Aim = animator:LoadAnimation(AnimFolder:FindFirstChild(tool.Name.." Aim"));
+}
+
+function Animation(boolean,Animation)
+	if boolean then
+		Animations[Animation]:Play()
+	else
+		if Animation == "All" then
+			for i,v in pairs(Animations) do
+				v:Stop()
+			end
+		else
+			Animations[Animation]:Stop()
+		end
+	end
+end
+
+function CheckIfAlive()
+	return (((plr and plr.Parent and char and char.Parent and hum and hum.Parent and hum.Health > 0 and char.PrimaryPart and char.PrimaryPart.Parent) and true) or false)
+end
+
+function Activated()
+	if Mag <= 0 or not tool.Enabled or not hum or not CheckIfAlive() or charStateVals:FindFirstChild("RArmBroken").Value then return end
+	tool.Enabled = false
+	FireEvent:FireServer(Rep.Assets:FindFirstChild("Flintlock Pistol Bullet"), handle:FindFirstChild("FirePoint").WorldCFrame, char, tool, BulletSettings)
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	if toggle then
+		Animation(true,"AimFire")
+	else
+		Animation(true,"Fire")
+	end
+	Animation(false,"Idle")
+	Animation(true,"NAIdle")
+	SoundEvent:FireServer(true,handle:FindFirstChild("HammerImpact"))
+	SoundEvent:FireServer(true,handle:FindFirstChild("Fire"))
+	SoundEvent:FireServer(true,handle:FindFirstChild("FireBass"))
+	SoundEvent:FireServer(true,handle:FindFirstChild("FireSmoke"))
+	SoundEvent:FireServer(true,handle:FindFirstChild("FireSmokeEcho"))
+	Particles()
+
+	CooldownEvent:Fire(CooldownUIValues)
+	task.wait(Cooldown)
+
+	Mag -= 1
+
+	if Mag <= 0 then
+		ContextActionService:BindAction("Reload", Reload, true,Enum.KeyCode.R)
+		ContextActionService:SetTitle("Reload","Reload")
+		ContextActionService:SetPosition("Reload",UDim2.new(-0.5, 0, -0.05, 0))
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	end
+end
+
+function Equipped()
+	plr.CameraMode = Enum.CameraMode.LockFirstPerson
+	ContextActionService:BindAction("Aim", Aim, true,Enum.KeyCode.E,Enum.UserInputType.MouseButton2)
+	ContextActionService:SetTitle("Aim","Aim")
+
+	task.spawn(function()
+		SlowEvent:FireServer(true,hum,HoldingWalkSpeedRate)
+		SoundEvent:FireServer(true,handle:FindFirstChild("Equip"))
+		tool.Enabled = false
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+
+		CooldownEvent:Fire(CooldownUIValues)
+		task.wait(Cooldown)
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+		tool.Enabled = true
+	end)
+
+	GripEvent:FireServer(true,tool,char:FindFirstChild("Right Arm"))
+
+	if Mag >= 1 then
+		Animation(true,"Equip")
+		Animation(true,"Idle")
+		task.wait(.1)
+		SoundEvent:FireServer(true,handle:FindFirstChild("Hammer"))
+	else
+		Animation(true,"NAEquip")
+		Animation(true,"NAIdle")
+		ContextActionService:BindAction("Reload", Reload, true,Enum.KeyCode.R)
+		ContextActionService:SetTitle("Reload","Reload")
+		ContextActionService:SetPosition("Reload",UDim2.new(-0.5, 0, -0.05, 0))
+	end
+end
+
+function Unequipped()
+	ContextActionService:UnbindAction("Reload")
+	ContextActionService:UnbindAction("Aim")
+	plr.CameraMode = Enum.CameraMode.Classic
+
+	GripEvent:FireServer(false,tool,char:FindFirstChild("Right Arm"))
+	Animation(false,"All")
+	Reloading = false
+	charStateVals:FindFirstChild("PauseArm").Value = false
+
+	task.spawn(function()
+		SoundEvent:FireServer(false,handle:GetChildren())
+		SlowEvent:FireServer(false,hum)
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	end)
+end
+
+tool.Activated:Connect(Activated)
+tool.Equipped:Connect(Equipped)
+tool.Unequipped:Connect(Unequipped)
+
+Reloading = false
+
+function Reload()
+	if Mag <= 0 and not Reloading then
+		Reloading = true
+		toggle = false
+		Animation(false,"Aim")
+		charStateVals:FindFirstChild("PauseArm").Value = true
+		SlowEvent:FireServer(false,hum)
+		SlowEvent:FireServer(true,hum,ReloadWalkSpeedRate)
+		Animation(true,"Reload")
+	end
+end
+
+function Aim(actionName, inputState, inputObject)
+	if not Reloading then
+		if inputObject.KeyCode == Enum.KeyCode.E or inputObject.UserInputType == Enum.UserInputType.Touch then
+			if inputState == Enum.UserInputState.Begin then
+				Animation(not toggle,"Aim")
+				toggle = not toggle
+			end
+		elseif inputObject.UserInputType == Enum.UserInputType.MouseButton2 then
+			if inputState == Enum.UserInputState.Begin then
+				if not toggle then
+					Animation(true,"Aim")
+					toggle = true
+				end
+			elseif inputState == (Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel) then
+				Animation(false,"Aim")
+				toggle = false
+			end
+		end
+		if toggle then
+			SlowEvent:FireServer(false,hum)
+			SlowEvent:FireServer(true,hum,AimingWalkSpeedRate)
+		else
+			SlowEvent:FireServer(false,hum)
+			SlowEvent:FireServer(true,hum,HoldingWalkSpeedRate)
+		end
+	end
+end
+
+function Sound(p)
+	SoundEvent:FireServer(true,handle:FindFirstChild(p))
+end
+
+function Particles()
+	task.spawn(function()
+		for i,v in pairs(handle:GetDescendants()) do
+			if v:IsA("ParticleEmitter") then
+				EnableEvent:FireServer(v)
+			elseif v:IsA("Light") then
+				EnableEvent:FireServer(v,.1)
+			end
+		end
+	end)
+end
+
+function Add(p)
+	AddEvent:FireServer(Rep.Assets:FindFirstChild(p),workspace:FindFirstChild("Props"):FindFirstChild("Tools"),char:FindFirstChild("Left Arm"),tool)
+end
+
+function Remove(p)
+	RemoveEvent:FireServer(workspace:FindFirstChild("Props"):FindFirstChild("Tools"):FindFirstChild(p))
+end
+
+function Finish()
+	SlowEvent:FireServer(false,hum)
+	SlowEvent:FireServer(true,hum,HoldingWalkSpeedRate)
+	Animation(false,"NAIdle")
+	Animation(true,"Idle")
+	ContextActionService:UnbindAction("Reload")
+	tool.Enabled = true
+	Reloading = false
+	Mag = MagCapacity
+
+	charStateVals:FindFirstChild("PauseArm").Value = false
+end
+
+Animations.Reload:GetMarkerReachedSignal("Sound"):Connect(Sound)
+Animations.Reload:GetMarkerReachedSignal("Add"):Connect(Add)
+Animations.Reload:GetMarkerReachedSignal("Remove"):Connect(Remove)
+Animations.Reload:GetMarkerReachedSignal("Finish"):Connect(Finish)
