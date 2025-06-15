@@ -1,0 +1,53 @@
+local Module = require(script.MainModule)
+Module:Load()
+
+--MAIN DETECTOR
+
+local Rep = game:GetService("ReplicatedStorage")
+local DB = game:GetService("Debris")
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules.RaycastHitbox)
+local Particle = require(Modules.Particle)
+local ImpactFrame = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect"):WaitForChild("ImpactFrame")
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+local ThrowEvent = WeaponEvents:WaitForChild("Throw")
+
+local UnguardEvent = WeaponEvents:WaitForChild("Unguard")
+
+function Hitted(plr,IsHum,Position,Hit,Damage,Hum,PrimaryPart,Effects)
+	Module:Hitted(plr,IsHum,Position,Hit,Damage,Hum,PrimaryPart,Effects)
+end
+
+function Grip(plr,bool,tool,arm)
+	Module:Grip(plr,bool,tool,arm)
+end
+
+function Sound(plr,bool,v)
+	Module:Sound(plr,bool,v)
+end
+
+function Slow(plr,bool,hum,WalkSpeedRate,bypass)
+	Module:Slow(plr,bool,hum,WalkSpeedRate,bypass)
+end
+
+function Blood(h,pos,part,pp)
+	Module:Blood(h,pos,part,pp)
+end
+
+function Throw(plr,tool,part,velocity,proptime)
+	Module:Throw(plr,tool,part,velocity,proptime)
+end
+
+GripEvent.OnServerEvent:Connect(Grip)
+HitEvent.OnServerEvent:Connect(Hitted)
+SoundEvent.OnServerEvent:Connect(Sound)
+SlowEvent.OnServerEvent:Connect(Slow)
+ThrowEvent.OnServerEvent:Connect(Throw)
