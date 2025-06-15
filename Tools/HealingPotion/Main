@@ -1,0 +1,152 @@
+local Rep = game:GetService("ReplicatedStorage")
+local SG = game:GetService("StarterGui")
+local DB = game:GetService("Debris")
+local RS = game:GetService("RunService")
+repeat task.wait() until game:IsLoaded()
+RS.Stepped:Wait(.1)
+
+--modules
+local Modules = Rep:WaitForChild("Modules")
+local RaycastHitbox = require(Modules:WaitForChild("RaycastHitbox"))
+local Particle = require(Modules:WaitForChild("Particle"))
+
+--remote events
+local WeaponEvents = Rep:WaitForChild("Events"):WaitForChild("WeaponSystem")
+local HealEvents = Rep:WaitForChild("Events"):WaitForChild("HealSystem")
+local GripEvent = WeaponEvents:WaitForChild("Grip")
+local HitEvent = WeaponEvents:WaitForChild("Hitted")
+local SlowEvent = WeaponEvents:WaitForChild("Slow")
+local SoundEvent = WeaponEvents:WaitForChild("Sound")
+local ThrowEvent = WeaponEvents:WaitForChild("Throw")
+local HealEvent = HealEvents:WaitForChild("Heal")
+
+--bindable events
+local PlayerEffectEvents = Rep:WaitForChild("Events"):WaitForChild("PlayerEffect")
+local CooldownEvent = PlayerEffectEvents:WaitForChild("Cooldown")
+
+--variables
+local plr = game:GetService("Players").LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local animator = hum:WaitForChild("Animator")
+
+local tool = script.Parent
+local handle = tool:WaitForChild("Model")
+
+local config = tool:WaitForChild("Configuration")
+
+local AnimFolder = Rep:WaitForChild("Animations")
+
+--values
+local Settings = require(config.Settings)
+local Cooldown = Settings.Cooldown
+local Heal = Settings.Heal
+local Amount = Settings.Amount
+local WalkSpeedRate = Settings.WalkSpeedRate
+
+local charval = char:WaitForChild("CharacterValues")
+local charGuardVals = charval:WaitForChild("Guard")
+local charStateVals = charval:WaitForChild("State")
+
+local plrval = plr:WaitForChild("PlayerValues")
+
+local CooldownUIValues = {tool.Name,Color3.fromRGB(217, 217, 217),Cooldown}
+
+SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+--animations
+
+local Animations = {
+	Idle = animator:LoadAnimation(AnimFolder:FindFirstChild("Drink Idle"));
+	Equip = animator:LoadAnimation(AnimFolder:FindFirstChild("Drink Equip"));
+	Drink = animator:LoadAnimation(AnimFolder:FindFirstChild("Drink"));
+}
+
+function Animation(boolean,Animation)
+	if boolean then
+		Animations[Animation]:Play()
+	else
+		if Animation == "All" then
+			for i,v in pairs(Animations) do
+				v:Stop()
+			end
+		else
+			Animations[Animation]:Stop()
+		end
+	end
+end
+
+function CheckIfAlive()
+	return (((plr and plr.Parent and char and char.Parent and hum and hum.Parent and hum.Health > 0 and char.PrimaryPart and char.PrimaryPart.Parent) and true) or false)
+end
+
+function Activated()
+	if charGuardVals:FindFirstChild("Guard").Value or not tool.Enabled or not hum or not CheckIfAlive() or charStateVals:FindFirstChild("RArmBroken").Value then return end
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	tool.Enabled = false
+
+	Animation(true,"Drink")
+	charStateVals:FindFirstChild("PauseArm").Value = true
+	SlowEvent:FireServer(true,hum,WalkSpeedRate)
+end
+
+function Equipped()
+	task.spawn(function()
+		SoundEvent:FireServer(true,handle:FindFirstChild("Equip"))
+		tool.Enabled = false
+		charStateVals:FindFirstChild("PauseArm").Value = false
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+
+		CooldownEvent:Fire(CooldownUIValues)
+		task.wait(Cooldown)
+
+		SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+
+		tool.Enabled = true
+		SlowEvent:FireServer(false,hum)
+	end)
+
+	GripEvent:FireServer(true,tool,char:FindFirstChild("Right Arm"))
+	Animation(true,"Equip")
+	Animation(true,"Idle")
+end
+
+function Unequipped()
+	GripEvent:FireServer(false,tool,char:FindFirstChild("Right Arm"))
+	Animation(false,"All")
+	charStateVals:FindFirstChild("PauseArm").Value = false
+
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	SoundEvent:FireServer(false,handle:GetChildren())
+	SlowEvent:FireServer(false,hum)
+end
+
+function Drink()
+	SoundEvent:FireServer(true,handle:FindFirstChild("Drink"))
+	HealEvent:FireServer(char,hum,Heal,Amount)
+end
+
+function Throw()
+	charStateVals:FindFirstChild("PauseArm").Value = false
+	SoundEvent:FireServer(true,handle:FindFirstChild("Throw"))
+	tool.Enabled = false
+
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+
+	CooldownEvent:Fire(CooldownUIValues)
+	task.wait(Cooldown)
+
+	Animation(false,"All")
+	SG:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
+	SlowEvent:FireServer(false,hum)
+
+	ThrowEvent:FireServer(tool,handle,char:FindFirstChild("HumanoidRootPart").CFrame.LookVector*-1,10)
+end
+
+tool.Activated:Connect(Activated)
+tool.Equipped:Connect(Equipped)
+tool.Unequipped:Connect(Unequipped)
+
+Animations.Drink:GetMarkerReachedSignal("Drink"):Connect(Drink)
+Animations.Drink:GetMarkerReachedSignal("Throw"):Connect(Throw)
